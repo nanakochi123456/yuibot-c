@@ -1,10 +1,10 @@
 # for debug
-CC=gcc
-CCOPT=-g -DDEBUG=1
+#CC=gcc
+#CCOPT=-g -DDEBUG=1
 
 # stable
-#CC=gcc
-#CCOPT = -O2 
+CC=gcc
+CCOPT = -O2 
 
 # gcc 2.7.x... max
 #CC=gcc

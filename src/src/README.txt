@@ -9,3 +9,7 @@ http://www.ibport.ne.jp/~yui/cgiwork/yuichat/
 
 ・作り方
 make で通るはずです。
+
+・変更履歴
+　2006/06/09
+　ゆいぼっとが急に無視しはじめたので、強引に修正した

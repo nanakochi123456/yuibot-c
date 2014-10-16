@@ -93,7 +93,7 @@ void unlock() {
 
 // —”
 int	dice(int n) {
-	return (random() % n + getpid() % n) % n;
+	return (random()  + getpid() ) % n;
 }
 
 char	*stack_init(STACK **stack, int memsize) {

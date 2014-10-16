@@ -330,7 +330,6 @@ void	bot_write() {
 void	yuibot(int count) {
 	int		i, r = -1, tmp;
 	botmessage[0] = '\0';
-
 	if (!botmembercount) return;
 
 	/* ‚¨‚Ý‚­‚¶ */
@@ -381,12 +380,13 @@ void	yuibot(int count) {
 			if (current.MEMBERS_TALK[(count > 10 ? 10 : count) - 1] > dice(100) || r == -2) {
 				if (dice(100) > BOKE_RATIO) {
 					/* Ž«‘‚ª‚Ð‚¯‚é‚©nowbotmembers~2‰ñ‚Ü‚Å‚Ü‚ÅŒJ‚è•Ô‚· */
-					if (nowbotmembers > 1) {
-						for (i = 0; bot() == 0 && i < nowbotmembers * 2; i++) {
+//					if (nowbotmembers > 1) {
+//						for (i = 0; bot() == 0 && i < nowbotmembers * 2; i++) {
+						for (i = 0; bot() == 0 && i < BOT_MEMBERS * 2; i++) {
 							while(botmember[(r = dice(BOT_MEMBERS))].BOT_FILE == NULL);
 							current = botmember[r];
 						}
-					}
+//					}
 				} else {
 					bot2();	/* ‚Â‚Á‚±‚Ý */
 				}
