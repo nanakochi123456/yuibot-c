@@ -28,7 +28,6 @@ char			*query_string, *request_method;
 char			*host;
 char			name[MAX_NAME], message[MAX_MESSAGE], message2[MAX_MESSAGE], message3[MAX_MESSAGE];
 char			emoji[MAX_NAME], email[MAX_NAME];
-char			color[MAX_NAME];
 #if YUI_CUTE == 1
 char			chara[MAX_NAME];
 #endif
@@ -36,7 +35,7 @@ char			htmlbuf[LINE_LENGTH];
 char			*htmlheader, *htmlfooter, *htmlautoreload, *htmlreload, *noframehtml;
 
 char			*name_p, *message_p, *emoji_p, *email_p;
-char			*env, *window, *reload, *chatmode;
+char			*env, *window, *reload, *color, *chatmode;
 char			*room;
 #if YUI_CUTE == 1
 char			*chara_p = NULL;
@@ -49,13 +48,9 @@ char			outbuff[LINE_LENGTH];
 char		   *logs[MAX_LINE];
 char			dmy[] = "";
 char			d_time[MAX_TIME];
-char		   *code = dmy;
 struct tm	   *tim;
 FILE		   *fp_dat;
 int 			ret;
-int				content = 0;
-FILE			*chat_out;
-
 static char    *youbi[] = {
 	"日", "月", "火", "水", "木", "金", "土"
 		};
@@ -63,6 +58,7 @@ static char    *youbi[] = {
 int main(void) {
     // 乱数初期化
     srandom(time(0));
+
 	GetValue(); 	 /*GET&POSTメソッドでのデコード処理＆SJIS変換*/
 	configread(room);
 #if KILL == 1
@@ -72,11 +68,7 @@ int main(void) {
 	referercheck();
 #endif
 	SetValue();
-#if MODE_SANKA == 0
 	Sanka();		  /*参加者記録処理*/
-#else
-	Sanka(strcmp(chatmode, "sanka") == 0 ? 0 : 1);
-#endif
 	if ((strcmp(message, "退室") == 0)) {		/*退室時は、書き込み後Locationヘッダ*/
 		Write();
 		fprintf(stdout, "Location: %s\n\n", END_PAGE);
@@ -142,14 +134,14 @@ void	referercheck() {
 #if REFERERCHECK == 1
 		return;
 #else
-		error(FORBIDDEN, dmy);
+		error(FORBIDDEN, "");
 #endif
 	strcpy(buff, s);
 	if (decode(buff, SJIS) != NORMAL)
-		error(FORBIDDEN, dmy);
+		error(FORBIDDEN, "");
 
 	if (strncmp(buff, REFERER, strlen(REFERER)) != 0)
-		error(FORBIDDEN, dmy);
+		error(FORBIDDEN, "");
 }
 
 #endif
@@ -162,13 +154,13 @@ void	getquery(void) {
 			query_string = getenv("QUERY_STRING");
 			if (query_string == NULL) query_string = "\0";
 			if (strlen(query_string) > LINE_LENGTH)
-				error(TOOLONG_STRING, dmy);
+				error(TOOLONG_STRING, "");
 			env = query_string;
 		} else if (strcmp(request_method, "POST") == 0) {
 			if (buf = getenv("CONTENT_LENGTH")) {
 				clength = atoi(buf);
 				if (clength > LINE_LENGTH)
-					error(TOOLONG_STRING, dmy);
+					error(TOOLONG_STRING, "");
 				env = malloc(clength + 10);
 				for (loop = 0; clength && (!feof(stdin)); loop++
 ) {
@@ -185,7 +177,7 @@ void	getquery(void) {
 void SetValue(void) {
 	if ((window) == dmy)	window = DEFAULTWINDOW;
 	if ((reload) == dmy)	reload = DEFAULTRELOAD;
-	if ((*color) == '\0')	strcpy(color, DEFAULTCOLOR);
+	if ((color) == dmy)		color = DEFAULTCOLOR;
 
 #if NO_NAMETAG == 0
 	NameTag();
@@ -203,24 +195,16 @@ void GetValue(void) {
 	char		   *decode_tmp; 	  /*デコード用TMP*/
 	current_time = time(NULL) + JISA;		 /*現在時刻が秒で入る*/
 	tim = localtime(&current_time);
-//	sprintf(d_time, "%d/%d(%s) %d:%02d",
-//			tim->tm_mon + 1,
-//			tim->tm_mday,
-//			youbi[tim->tm_wday],
-//			tim->tm_hour,
-//			tim->tm_min);				/*時刻表示のフォーマット*/
-	sprintf(d_time, "%d/%d/%d %d:%02d:%02d",
-			tim->tm_year + 1900,
+	sprintf(d_time, "%d/%d(%s) %d:%02d",
 			tim->tm_mon + 1,
 			tim->tm_mday,
+			youbi[tim->tm_wday],
 			tim->tm_hour,
-			tim->tm_min,
-			tim->tm_sec);
-			
+			tim->tm_min);				/*時刻表示のフォーマット*/
 	host = gethost();
 	getquery();
 	if (env == NULL || (forms[0].name = strtok(env, "&")) == NULL) {
-//		error(ACCESS_FORMAT, dmy);
+//		error(ACCESS_FORMAT, "");
 	} else {
 		   /*とりあえず、&記号で区切る。*/
 		for (i = 1; i < MAX_FORM; i++) {	/*MAX_FORMは formの要素数より大きく。 */
@@ -236,7 +220,7 @@ void GetValue(void) {
 			if ((forms[i].value = strtok(NULL, "&")) == NULL)
 					forms[i].value = dmy;
 		}
-
+		
 		for (i = 0; i < j; i++) {		/*name&valueのペアから、各変数に代入する。*/
 //			 printf("[%s= %s]<BR>\n",forms[i].name,forms[i].value); 
 			if (strcmp(forms[i].name, WINDOW_STR) == 0)
@@ -248,7 +232,7 @@ void GetValue(void) {
 			else if (strcmp(forms[i].name, CHAT_STR) == 0)
 					message_p = forms[i].value;
 			else if (strcmp(forms[i].name, COLOR_STR) == 0)
-					strcpy(color, forms[i].value);
+					color = forms[i].value;
 			else if (strcmp(forms[i].name, EMOJI_STR) == 0)
 					emoji_p = forms[i].value;
 			else if (strcmp(forms[i].name, EMAIL_STR) == 0)
@@ -257,9 +241,6 @@ void GetValue(void) {
 					chatmode = forms[i].value;
 			else if (strcmp(forms[i].name, ROOM_STR) == 0)
 					room = forms[i].value;
-// code=noip 処理
-else if (strcmp(forms[i].name, "code") == 0)	//noip
-	code = forms[i].value;						//noip
 #if YUI_CUTE == 1
 			else if (strcmp(forms[i].name, CHARA_STR) == 0)
 					chara_p = forms[i].value;
@@ -271,6 +252,7 @@ else if (strcmp(forms[i].name, "code") == 0)	//noip
 	if ((name_p) == NULL)		name_p = host;
 	if ((window) == NULL)		window = dmy;
 	if ((reload) == NULL)		reload = dmy;
+	if ((color) == NULL)		color = dmy;
 	if ((message_p) == NULL)	message_p = dmy;
 	if ((emoji_p) == NULL)		emoji_p = dmy;
 	if ((email_p) == NULL)		email_p = dmy;
@@ -284,48 +266,41 @@ else if (strcmp(forms[i].name, "code") == 0)	//noip
 	strncpy(chara, chara_p, MAX_NAME-1);	
 #endif
 	if (strlen(name) != 0) {
-		*(name + MAX_NAME-1) = '\0';		 /*万一に備えて\0を入れておく。おまぬけ？*/
+		*(name + 63*3) = '\0';		 /*万一に備えて\0を入れておく。おまぬけ？*/
 		ret = decode(name, SJIS);	   /*デコードしたのち、SJIS変換*/
 		if (ret != NORMAL)
-			error(ret, dmy);
+			error(ret, "");
 	}
 
 	if (strlen(message) != 0) {
 		*(message + MAX_MESSAGE-1) = '\0';
 		ret = decode(message, SJIS);
 		if (ret != NORMAL)
-			error(ret, dmy);
+			error(ret, "");
 	}
 
 	if (strlen(emoji) != 0) {
-		*(emoji + MAX_NAME-1) = '\0';
+		*(emoji + 63*3) = '\0';
 		ret = decode(emoji, SJIS);
 		if (ret != NORMAL)
-			error(ret, dmy);
+			error(ret, "");
 	}
 
 	if (strlen(email) != 0) {
-		*(email + MAX_NAME-1) = '\0';
+		*(email + 63*3) = '\0';
 		ret = decode(email, SJIS);
 		if (ret != NORMAL)
-			error(ret, dmy);
-	}
-
-	if (strlen(color) != 0) {
-		*(color + MAX_NAME-1) = '\0';
-		ret = decode(color, SJIS);
-		if (ret != NORMAL)
-			error(ret, dmy);
+			error(ret, "");
 	}
 
 #if YUI_CUTE == 1
 	if (*chara != '\0') {
 		ret = decode(chara, SJIS);
 		if (ret != NORMAL)
-			error(ret, dmy);
+			error(ret, "");
 #if YUI_CUTE_SEC == 1
 		if (dircheck(chara))
-			error(ret, dmy);
+			error(ret, "");
 #endif
 #ifdef	YUI_CUTE_EXT
 		strcat(chara, YUI_CUTE_EXT);
@@ -349,43 +324,13 @@ void	comment(char *s) {
 	}
 }
 
-void	Content() {
-	FILE	*fp;
-	char	*enc;
-
-	enc = getenv("HTTP_ACCEPT_ENCODING");
-
-	printf("Content-type: text/html\n");	  /*おきまりのヘッダ～*/
-	content=1;
-	if (enc != NULL) {
-		if (strstr(enc, "x-gzip")) {
-			if ((fp = popen("gzip -c -3", "w")) != NULL) {
-				chat_out=fp;
-				content=2;
-				printf("Content-Encoding: x-gzip\n");
-			}
-		}
-		if (strstr(enc, "gzip")) {
-			if ((fp = popen("gzip -c -3", "w")) != NULL) {
-				chat_out=fp;
-				content=2;
-				printf("Content-Encoding: gzip\n");
-			}
-		}
-		else chat_out = fopen("/dev/stdout", "w");
-	} else
-		chat_out = fopen("/dev/stdout", "w");
-
-	printf("\n");
-}
-
 void 	Html() {
-	Content();
+	printf("Content-type: text/html\n\n");	  /*おきまりのヘッダ～*/
 
 	/* ヘッダー */
 	strcpy(htmlbuf, htmlheader);
 	insertparm(htmlbuf, chatline);
-	fprintf(chat_out, "%s\n", htmlbuf);
+	puts(htmlbuf);
 
 #if MODE_SANKA == 1
 	if (strcmp(chatmode, "sanka") != 0) {
@@ -394,42 +339,35 @@ void 	Html() {
 		if (strcmp(reload, "0") != 0 && strcmp(chatmode, "checked") == 0) {
 			strcpy(htmlbuf, htmlautoreload);
 			insertparm(htmlbuf, chatline);
-			fprintf(chat_out, "%s\n", htmlbuf);
+			puts(htmlbuf);
 		}
-#if MODE_SANKA == 1
-	}
-#endif
-	fprintf(chat_out, "%s\n", BODY);
-#if MODE_SANKA == 1
-	if (strcmp(chatmode, "sanka") != 0) {
-#endif
+		printf("%s\n", BODY);
 
 		/* ノンフレーム発言欄 */
 		if (strcmp(chatmode, "checked") != 0) {
 			strcpy(htmlbuf, noframehtml);
 			insertparm(htmlbuf, chatline);
-			fprintf(chat_out, "%s\n", htmlbuf);
+			puts(htmlbuf);
 		}
 
 		/* リロードリンク */
 		strcpy(htmlbuf, htmlreload);
 		insertparm(htmlbuf, chatline);
-		fprintf(chat_out, "%s\n", htmlbuf);
+		puts(htmlbuf);
 #if MODE_SANKA == 1
 	}
 #endif
 
 	/* 参加者表示 */
 #if YUIBOT == 1 && OMIKUJI_ONLY == 0
-//	count = botsanka(count);
+	count = botsanka(count);
 #endif
 #if MODE_SANKA == 1
 	if (strcmp(chatmode, "sanka") == 0) {
 		strcpy(htmlbuf, SANKA_ONLY);
 		insertparm(htmlbuf, chatline);
-		fprintf(chat_out, "%s\n", htmlbuf);
-		strcpy(htmlbuf, allfooter);
-		fprintf(chat_out, "%s\n", htmlbuf);
+		puts(htmlbuf);
+		printf("%s", allfooter);
 		return;
 	}
 #endif
@@ -437,7 +375,7 @@ void 	Html() {
 #if NOTPRINT_SANKA != 1
 	strcpy(htmlbuf, SANKA_ALL);
 	insertparm(htmlbuf, chatline);
-	fprintf(chat_out, "%s\n", htmlbuf);
+	puts(htmlbuf);
 #endif
 
 	if (strlen(message) != 0) { 	 /*書き込みがある場合*/
@@ -450,7 +388,7 @@ void 	Html() {
 			if (logs[i] == NULL)
 					break;
 			comment(logs[i]);
-			fprintf(chat_out, "%s", logs[i]);
+			printf("%s", logs[i]);
 		}
 #if	YUIBOT == 1						/* ゆいぼっとの書き込み */
 		bot_write();
@@ -471,7 +409,7 @@ void 	Html() {
 			if (logs[i] == NULL)
 						break;
 				comment(logs[i]);
-				fprintf(chat_out, "%s", logs[i]);
+				printf("%s", logs[i]);
 			}
 #if FILE_LOCK != 0
 			unlock();
@@ -490,7 +428,7 @@ void 	Html() {
 				if (feof(fp_dat))
 						break;
 			}
-			fprintf(chat_out, "%s", buff);
+			printf("%s", buff);
 			
 		}
 		fclose(fp_dat);
@@ -498,12 +436,8 @@ void 	Html() {
 		}
 #endif
 	}			/* if else end */
-	strcpy(htmlbuf, htmlfooter);
-	insertparm(htmlbuf, chatline);
-	fprintf(chat_out, "%s", htmlbuf);
-	strcpy(htmlbuf, allfooter);
-	insertparm(htmlbuf, chatline);
-	fprintf(chat_out, "%s", htmlbuf);
+	printf("%s", htmlfooter);
+	printf("%s", allfooter);
 }
 
 void	command(char *cmd, char *str, char *str2) {
@@ -581,13 +515,6 @@ int		logswrite() {
 		error(FILE_WRITE_ERROR, "chat_file");
 		return;
 	}
-// code=noip処理
-if ((strcmp(code, "noip") == 0)) {	//noip
-char	*host2;						//noip
-host2 = malloc(1024);				//noip
-sprintf(host2, "<!--%s-->", host);	//noip
-host=host2;							//noip
-}									//noip
 	if ((strcmp(message, "退室") == 0)) {
 		strcpy(outbuff, MESSAGE_EXIT);
 		insertparm(outbuff, chatline);
@@ -637,7 +564,7 @@ void	doublelog() {
 		insertparm(message3, chatline);
 		fprintf(fp_dat, "%s", message3);
 		fclose(fp_dat);
-	} else error(FILE_WRITE_ERROR, "doublelog_file");
+	}
 }
 #endif
 
@@ -693,12 +620,12 @@ void	Rank(void) {
 		return;
 
 #if NO_NAMETAG == 0 && NO_TAG == 0
-	if (strstr(name, "<!") != NULL)
+	if (strstr(name, "<!") == NULL)
 		return;
 #endif
 
 	if ((rank_fp = fopen(CHAT_R, "r")) == NULL)
-		error(FILE_ERROR, "rank_file");
+		return;
 
 	for (;fgets(buff, LINE_LENGTH-1, rank_fp) != NULL; ++rankcnt) {
 		int 			argc = 0;
@@ -729,8 +656,10 @@ void	Rank(void) {
 	}
 	fclose(rank_fp);
 
-	if ((rank_fp = fopen(CHAT_R, "w")) == NULL)
+	if ((rank_fp = fopen(CHAT_R, "w")) == NULL) {
 		error(FILE_WRITE_ERROR, "rank_file");
+		return;
+	}
 
 	for (i = 0; i < rankcnt; i++) {
 	/* time が指定より上なら書き込み */
@@ -744,43 +673,16 @@ void	Rank(void) {
 #endif
 
 /* 更新する参加ファイルの読み込み */
-#if MODE_SANKA == 1
-void 	Sanka(int sankamode) {
-#else
-void	Sanka() {
-#endif
-	int 			argc = 0;
-	char		   *argv[10];
+void 	Sanka() {
 
 	if (*CHAT_S == '\0')
 		return;
 
 	if ((fp_dat = fopen(CHAT_S, "r")) == NULL)
-		error(FILE_ERROR, "sanka_file");
+		return;
 
-	while (fgets(buff, LINE_LENGTH-1, fp_dat) != NULL) {
-		argc = parse(buff, "\t", argv);
-		if (argc == 5) {/*5でない場合、分割に失敗したと思われる*/
-			members[number_of_members].name = AllocAndCopy(argv[1]);
-			members[number_of_members].site = AllocAndCopy(argv[2]);
-			members[number_of_members].color = AllocAndCopy(argv[3]);
-			members[number_of_members].time = atol(argv[0]);
-
-			if (strcmp(members[number_of_members].name, members[number_of_members].site) != 0) {
-				if ((members[number_of_members].time + 60) > current_time)
-						count++;
-				/* host一致でタイム更新 */
-				if (strcmp(host, members[number_of_members].site) == 0 && sankamode == 1) {
-					members[number_of_members].time = current_time;
-					members[number_of_members].name = name;
-					members[number_of_members].color = color;
-					found = 1;
-				}
-				number_of_members++;
-			} else number_of_rommembers++;
-		}
-	}
-
+	while (fgets(buff, LINE_LENGTH-1, fp_dat) != NULL)
+			ReadMembers(buff);
 	fclose(fp_dat);
 
 #if NO_NAMETAG == 0 && NO_TAG == 0
@@ -790,12 +692,13 @@ void	Sanka() {
 		if (strcmp(chatmode, "sanka") != 0) {
 #endif
 	/* 更新した参加ファイルの書き込み */
-		if ((fp_dat = fopen(CHAT_S, "w")) == NULL)
+		if ((fp_dat = fopen(CHAT_S, "w")) == NULL) {
 			error(FILE_WRITE_ERROR, "sanka_file");
-
+			return;
+		}
 		for (i = 0; i < number_of_members; i++) {		/*60秒以内のアクセスのみ書き込む*/
 			if ((members[i].time + 60) > current_time)
-				fprintf(fp_dat, "%d\t%s\t%s\t%s\td\n", (int)members[i].time, members[i].name, members[i].site, members[i].color);
+					fprintf(fp_dat, "%d\t%s\t%s\t%s\td\n", (int)members[i].time, members[i].name, members[i].site, members[i].color);
 		}
 
 		if (!found)
@@ -808,3 +711,34 @@ void	Sanka() {
 	}
 #endif
 }
+
+void 	ReadMembers(char *buff) {
+	int 			argc = 0;
+	char		   *argv[10];
+
+	argc = parse(buff, "\t", argv);
+	
+	if (argc == 5) {/*5でない場合、分割に失敗したと思われる*/
+		
+		members[number_of_members].name = AllocAndCopy(argv[1]);
+		members[number_of_members].site = AllocAndCopy(argv[2]);
+		members[number_of_members].color = AllocAndCopy(argv[3]);
+		members[number_of_members].time = atol(argv[0]);
+
+		if (strcmp(members[number_of_members].name, members[number_of_members].site) != 0) {
+			
+			if ((members[number_of_members].time + 60) > current_time)
+					count++;
+			/* host一致でタイム更新 */
+			
+			if (strcmp(host, members[number_of_members].site) == 0) {
+				members[number_of_members].time = current_time;
+				members[number_of_members].name = name;
+				members[number_of_members].color = color;
+				found = 1;
+			}
+			number_of_members++;
+		} else number_of_rommembers++;
+	}
+}
+
